@@ -11,36 +11,38 @@ pages render that JSON in the browser. No build step and no backend.
     web/                   browser pages (HTML, CSS, JS)
     web/data/              graph JSON read by the viewers
 
-## Requirements
-
-Python 3.11 with numpy and scipy:
-
-    python3 -m venv .venv
-    .venv/bin/python -m pip install -r requirements.txt
-
-## Convert a model
-
-Default model (E. coli) to `web/data/graph.json`:
-
-    python3 converter/convert.py
-
-Reaction to reaction projection to `web/data/reactions.json`:
-
-    python converter/convert.py --graph reaction
-
-Every `.mat` in `data/raw/` to one JSON each, plus the `models.json` index that
-fills the model dropdown:
-
-    python3 converter/convert.py --all
-
 ## Run the viewer
 
-Serve the `web` folder over HTTP and open it in a browser:
+The graph JSON in `web/data/` is already generated, so you can start right away.
+Serve the `web` folder and open it in a browser. This needs no extra packages,
+`http.server` is part of the standard library:
 
     python3 -m http.server 8000 --directory web
 
-Pages:
+Then open the pages:
 
-    /                     organized view (subsystem blocks, isolated node view)
-    /index-base.html      base bipartite view
-    /reactions.html       reaction to reaction projection
+    http://localhost:8000/                  organized view (subsystem blocks, isolated node view)
+    http://localhost:8000/index-base.html   base bipartite view
+    http://localhost:8000/reactions.html    reaction to reaction projection
+
+## Regenerate the data (optional)
+
+Only needed to rebuild the JSON or add a model. Create a virtual environment and
+activate it, so plain `python` points at it instead of the system one (that is the
+usual cause of a "No module named scipy" error):
+
+    python3 -m venv .venv
+    source .venv/bin/activate          # Windows: .venv\Scripts\activate
+    pip install -r requirements.txt
+
+With the environment active:
+
+    python converter/convert.py                   # default model to web/data/graph.json
+    python converter/convert.py --graph reaction  # projection to web/data/reactions.json
+    python converter/convert.py --all             # every .mat in data/raw/ plus models.json
+
+If you would rather not activate, call the venv Python directly:
+
+    .venv/bin/python converter/convert.py
+
+Needs Python 3.11 or newer with numpy and scipy.
