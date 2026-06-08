@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Metabolic network (bipartite, base backup) - D3</title>
+  <link rel="stylesheet" href="css/viewer.css" />
+</head>
+<body>
+  <!-- Toolbar: search, color toggles, subsystem select, reset. -->
+  <header id="toolbar">
+    <input id="search" type="search" placeholder="search node by name or id..." />
+
+    <label class="tg"><input type="checkbox" id="t-sub" /> color by subsystem</label>
+
+    <label class="tg"><input type="checkbox" id="t-comp" /> color by compartment</label>
+
+    <!-- Currency metabolites start hidden (unchecked). -->
+    <label class="tg"><input type="checkbox" id="t-curr" /> show currency</label>
+
+    <label class="tg"><input type="checkbox" id="t-lbl" checked /> show labels</label>
+
+    <!-- Isolate one subsystem (options filled by the JS from the data). -->
+    <select id="sub-select"><option value="">(subsystem: all)</option></select>
+
+    <button id="reset">reset</button>
+  </header>
+
+  <!-- Legend strip, filled by the JS when a color toggle is on. -->
+  <div id="legend"></div>
+
+  <!-- Graph canvas. -->
+  <svg id="graph"></svg>
+
+  <!-- Layout panel: force sliders; the value= match LAYOUT_DEFAULTS in viewer.js. -->
+  <aside id="layout-panel">
+    <header class="panel-head">
+      <span>layout</span>
+      <button id="lp-toggle" class="lp-toggle" title="collapse / expand">▾</button>
+    </header>
+    <div class="panel-body">
+      <!-- Repulsion between nodes: more negative spreads the network wider. -->
+      <label class="ctl">
+        <span>repulsion</span>
+        <input type="range" id="lp-charge" min="-400" max="-20" step="10" value="-160" />
+        <span class="val" id="lp-charge-v">-160</span>
+      </label>
+      <!-- Base edge length (the node radius is added at hubs). -->
+      <label class="ctl">
+        <span>link length</span>
+        <input type="range" id="lp-link" min="20" max="140" step="5" value="55" />
+        <span class="val" id="lp-link-v">55</span>
+      </label>
+      <!-- Extra anti overlap padding around each node. -->
+      <label class="ctl">
+        <span>collision</span>
+        <input type="range" id="lp-collide" min="0" max="14" step="1" value="3" />
+        <span class="val" id="lp-collide-v">3</span>
+      </label>
+      <!-- Separate the two types: metabolites left, reactions right. -->
+      <label class="ctl chk">
+        <input type="checkbox" id="lp-separate" /> separate metabolites / reactions
+      </label>
+      <button id="lp-recompute">recompute layout</button>
+    </div>
+  </aside>
+
+  <!-- Selected node details. -->
+  <div id="info"><span class="muted">Click a node to see its details</span></div>
+
+  <!-- Isolated view bar: shown by the JS only when a node is isolated (display:none
+       by default). It has its own search, filters and exit. -->
+  <aside id="iso-panel" aria-label="isolated node view">
+    <div class="iso-line iso-line-top">
+      <button id="iso-exit" class="iso-btn iso-exit" title="Leave the isolated view (or press Esc)">Exit isolated view</button>
+      <span class="iso-focal" id="iso-focal-name">-</span>
+      <button id="iso-fit" class="iso-btn" title="Frame all the neighbours currently shown">Fit to view</button>
+    </div>
+    <div class="iso-line iso-line-cols">
+      <span class="iso-col iso-col-in"><b id="iso-head-in">INPUT</b> <span class="iso-count" id="iso-count-in">0 / 0</span></span>
+      <span class="iso-col iso-col-out"><b id="iso-head-out">OUTPUT</b> <span class="iso-count" id="iso-count-out">0 / 0</span></span>
+    </div>
+    <div class="iso-line iso-line-ctl">
+      <input id="iso-search" type="search" placeholder="search neighbour by name or id..." />
+      <select id="iso-group"><option value="">(all)</option></select>
+      <label class="tg" id="iso-rev-wrap"><input type="checkbox" id="iso-rev" /> reversible only</label>
+      <label class="tg"><input type="checkbox" id="iso-sort" checked /> sort A-Z</label>
+    </div>
+  </aside>
+
+  <!-- D3 v7 from the CDN, loaded before our script. -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script src="js/viewer.js?v=8"></script>
+</body>
+</html>

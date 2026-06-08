@@ -1,0 +1,318 @@
+/* viewer.css: styles for the bipartite viewer.
+   Four groups: page and graph layout, toolbar, legend, info panel. All visible
+   text lives in the HTML and JS, not here. */
+
+
+/* (1) General layout.
+   overflow:hidden because the graph is navigated with zoom and pan. */
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #222;
+}
+
+/* The SVG canvas fills the window and sits below the toolbar and legend. */
+#graph {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #fafafa;
+}
+
+
+/* (2) Top bar (#toolbar). Fixed row on top, above the graph. */
+#toolbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 10;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.97);
+  border-bottom: 1px solid #e3e6ea;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  font-size: 13px;
+}
+
+#toolbar input[type="search"] {
+  padding: 5px 9px;
+  border: 1px solid #ccd1d6;
+  border-radius: 4px;
+  font-size: 13px;
+  min-width: 220px;
+}
+
+/* Each toggle (.tg): checkbox plus label on one line. */
+#toolbar .tg {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #444;
+  cursor: pointer;
+  user-select: none;
+}
+
+#toolbar select {
+  padding: 4px 6px;
+  border: 1px solid #ccd1d6;
+  border-radius: 4px;
+  max-width: 260px;
+  font-size: 13px;
+}
+
+#toolbar button {
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid #c5c9ce;
+  border-radius: 4px;
+  background: #fafbfc;
+}
+#toolbar button:hover { background: #f0f2f4; }
+
+
+/* (3) Legend strip (#legend). Below the toolbar, empty until a color toggle is on. */
+#legend {
+  position: fixed;
+  top: 44px; left: 0; right: 0;
+  z-index: 9;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 14px;
+  align-items: center;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: #555;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+/* Legend entry (.sw = swatch): color square plus label, click to isolate the group. */
+#legend .sw {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+#legend .sw:hover { color: #111; }
+
+/* The color square (an <i> created by the JS). */
+#legend .sw i {
+  width: 12px; height: 12px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+
+/* (4) Details panel (#info). Floating bottom left.
+   pointer-events:auto so the panel stays clickable and scrollable. */
+#info {
+  position: fixed;
+  bottom: 12px; left: 12px;
+  max-width: 300px;
+  max-height: 60vh;        /* scrolls when a node has many connections */
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #222;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  pointer-events: auto;    /* clickable and scrollable for long lists */
+  z-index: 8;
+}
+
+#info .title { font-weight: 600; margin-bottom: 4px; word-break: break-word; }
+
+/* "Isolate this node" action button under the title. */
+#info .info-action {
+  display: block;
+  width: 100%;
+  margin: 2px 0 8px 0;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: #fff;
+  background: #8e5fd0;
+  border: 1px solid #7a4dc0;
+  border-radius: 4px;
+}
+#info .info-action:hover { background: #7d4dc7; }
+
+#info .muted { color: #777; }
+
+/* Two column details list (label and value) with CSS grid. */
+#info dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 1px 8px; }
+#info dt { color: #777; }
+#info dd { margin: 0; word-break: break-word; }
+
+/* Direct connections of the node (produced/consumed, substrates/products). */
+#info .conn { margin-top: 8px; }
+#info .conn-h { color: #555; font-weight: 600; font-size: 12px; margin-bottom: 2px; }
+#info .conn ul { margin: 0; padding-left: 16px; font-size: 12px; }
+#info .conn li { word-break: break-word; }
+/* "+N more" row: no bullet, grey italic. */
+#info .conn li.more { list-style: none; margin-left: -16px; color: #888; font-style: italic; }
+
+
+/* (5) Layout panel (#layout-panel). Floating card top right with the force sliders.
+   Grid of label, slider and value per row. */
+#layout-panel {
+  position: fixed;
+  top: 52px; right: 12px;
+  z-index: 9;
+  width: 234px;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+  color: #333;
+}
+
+/* Panel header: title plus open and close button. */
+#layout-panel .panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 1px solid #e3e6ea;
+  font-weight: 600;
+}
+
+#layout-panel .lp-toggle {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0 2px;
+  color: #555;
+}
+
+#layout-panel .panel-body {
+  padding: 9px 10px;
+  display: grid;
+  gap: 9px;
+}
+/* The JS adds .collapsed to hide the body. */
+#layout-panel.collapsed .panel-body { display: none; }
+
+/* Control row: label, slider, numeric value. */
+#layout-panel .ctl {
+  display: grid;
+  grid-template-columns: 4.6em 1fr 2.6em;
+  align-items: center;
+  gap: 7px;
+}
+/* Checkbox rows have no value column. */
+#layout-panel .ctl.chk { grid-template-columns: auto 1fr; gap: 6px; cursor: pointer; }
+#layout-panel .ctl input[type="range"] { width: 100%; }
+/* Fixed width digits so the value does not jump. */
+#layout-panel .ctl .val {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: #555;
+}
+
+#layout-panel #lp-recompute {
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid #c5c9ce;
+  border-radius: 4px;
+  background: #fafbfc;
+}
+#layout-panel #lp-recompute:hover { background: #f0f2f4; }
+
+
+/* (6) Isolated view bar (#iso-panel). Shown by the JS only while isolating
+   (display:none by default). Three rows: exit, name and fit; column headers
+   with counts; its own search and filters. */
+#iso-panel {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 12;
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.98);
+  border-bottom: 1px solid #d9dde1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  font-size: 13px;
+  color: #222;
+}
+
+#iso-panel .iso-line { display: flex; align-items: center; gap: 10px; }
+#iso-panel .iso-line-top { justify-content: space-between; }
+#iso-panel .iso-line-ctl { flex-wrap: wrap; }
+
+/* Focal breadcrumb: centered between the two buttons, kept on one line. */
+#iso-panel .iso-focal { flex: 1; text-align: center; font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; }
+/* One breadcrumb: previous steps are clickable links, the current one is neutral. */
+#iso-panel .bc-crumb {
+  display: inline-block; vertical-align: bottom; max-width: 220px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#iso-panel .bc-crumb:not(.bc-current) { color: #3b6fd4; cursor: pointer; }
+#iso-panel .bc-crumb:not(.bc-current):hover { text-decoration: underline; }
+#iso-panel .bc-current { color: #1c2127; }
+#iso-panel .bc-sep  { color: #9aa1a8; font-weight: 400; margin: 0 6px; }
+#iso-panel .bc-more { color: #3b6fd4; font-weight: 700; cursor: pointer; margin: 0 2px; }
+#iso-panel .bc-more:hover { text-decoration: underline; }
+
+/* Exit and Fit buttons. Exit has a soft red accent. */
+#iso-panel .iso-btn {
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid #c5c9ce;
+  border-radius: 4px;
+  background: #fafbfc;
+  white-space: nowrap;
+}
+#iso-panel .iso-btn:hover { background: #f0f2f4; }
+#iso-panel .iso-exit { border-color: #d8a0a0; background: #fbf2f2; color: #9a3b3b; }
+#iso-panel .iso-exit:hover { background: #f6e7e7; }
+
+/* Column headers row: input on the left, output on the right. */
+#iso-panel .iso-line-cols { justify-content: space-between; color: #555; font-size: 12px; }
+#iso-panel .iso-col-out { text-align: right; }
+#iso-panel .iso-count { font-variant-numeric: tabular-nums; color: #777; margin-left: 4px; }
+
+/* Dedicated search field, grows to fill the row. */
+#iso-panel input[type="search"] {
+  flex: 1;
+  min-width: 200px;
+  padding: 5px 9px;
+  border: 1px solid #ccd1d6;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+/* Filter dropdown (subsystem or compartment). */
+#iso-panel select {
+  padding: 4px 6px;
+  border: 1px solid #ccd1d6;
+  border-radius: 4px;
+  max-width: 260px;
+  font-size: 13px;
+}
+
+/* Toggles (reversible only, alphabetical sort): checkbox plus label. */
+#iso-panel .tg {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #444;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}

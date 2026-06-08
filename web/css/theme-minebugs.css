@@ -1,0 +1,187 @@
+/* theme-minebugs.css: MINEBUGS theme for the organized viewer.
+   Loaded after viewer.css by index.html and organized.html only; the overrides
+   reuse viewer.css selectors and win by load order. The base page
+   (index-base.html) loads viewer.css alone and keeps its original look.
+   Needs a modern browser (:has(), accent-color, appearance). */
+
+:root{
+  --mb-purple:#6a306c; --mb-purple-dark:#5a285c; --mb-purple-50:#faf5fb; --mb-purple-100:#ecd9ee;
+  --mb-teal:#2f474a; --mb-mint:#6ef1c7; --mb-mint-ring:rgba(110,241,199,.30); --mb-mint-text:#0f766e;
+  --mb-ink:#1f2937; --mb-muted:#64748b; --mb-muted-2:#94a3b8;
+  --mb-line:#e8edf0; --mb-surf-2:#f8fafc;
+  --mb-r-lg:18px; --mb-r-md:13px; --mb-r-pill:999px;
+  --mb-sh:0 10px 30px rgba(100,116,139,.14); --mb-sh-sm:0 2px 8px rgba(100,116,139,.12);
+}
+
+/* Shared surface for every panel: soft frosted glass. */
+#toolbar, #legend, #info, #layout-panel, #iso-panel{
+  background:rgba(255,255,255,.88);
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  border-color:var(--mb-line);
+  color:var(--mb-ink);
+}
+
+/* Toolbar */
+#toolbar{ border-bottom:1px solid var(--mb-line); box-shadow:var(--mb-sh-sm); gap:12px; }
+#toolbar .page-title{ color:var(--mb-ink); font-weight:800; }
+/* Toggles styled as switches, all on the checkbox so the markup is untouched. */
+#toolbar .tg{ color:#334155; font-weight:600; gap:9px; }
+#toolbar .tg input[type="checkbox"]{
+  appearance:none; -webkit-appearance:none; margin:0; cursor:pointer; flex:0 0 auto;
+  width:38px; height:22px; border-radius:999px; background:#e2e8f0; position:relative; transition:.15s;
+}
+#toolbar .tg input[type="checkbox"]::before{
+  content:""; position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%;
+  background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:.15s;
+}
+#toolbar .tg input[type="checkbox"]:checked{ background:var(--mb-purple); }
+#toolbar .tg input[type="checkbox"]:checked::before{ left:18px; }
+/* Ghost pill buttons (fit, reset). */
+#toolbar button{
+  border:1px solid var(--mb-line); border-radius:var(--mb-r-pill); background:#fff;
+  color:var(--mb-muted); font-weight:700; padding:6px 14px;
+}
+#toolbar button:hover{ background:var(--mb-surf-2); border-color:#d8dee3; color:var(--mb-ink); }
+
+/* Legend */
+#legend{ box-shadow:var(--mb-sh-sm); color:#334155; }
+#legend .sw{ font-weight:600; }
+#legend .sw i{ width:13px; height:13px; border:1.5px solid #fff; box-shadow:0 0 0 1px #cbd5e1; }
+
+/* Reusable primary button: info actions and recompute layout. */
+#info .info-action, #layout-panel #op-recompute{
+  background:var(--mb-purple); border:none; color:#fff; border-radius:var(--mb-r-pill);
+  font-weight:700; box-shadow:0 6px 16px rgba(106,48,108,.22); padding:8px 14px; width:100%;
+}
+#info .info-action:hover, #layout-panel #op-recompute:hover{ background:var(--mb-purple-dark); }
+
+/* Layout panel */
+#layout-panel{ border:1px solid var(--mb-line); border-radius:var(--mb-r-lg); box-shadow:var(--mb-sh); color:#334155; }
+#layout-panel .panel-head{
+  border-bottom:1px solid var(--mb-line); color:var(--mb-muted);
+  font-weight:800; font-size:11px; text-transform:uppercase; letter-spacing:.05em;
+}
+#layout-panel .lp-toggle{ color:var(--mb-muted); }
+#layout-panel .ctl .val{ color:var(--mb-muted); }
+/* Slider fill and thumb in dark teal via accent-color. */
+#layout-panel input[type="range"]{ accent-color:var(--mb-teal); height:6px; }
+
+/* Info panel */
+#info{ border:1px solid var(--mb-line); border-radius:var(--mb-r-lg); box-shadow:var(--mb-sh); color:var(--mb-ink); }
+#info .title{ font-weight:800; }
+#info .muted{ color:var(--mb-muted-2); }
+#info dt{ color:var(--mb-muted); }
+#info .conn-h{ color:var(--mb-muted); text-transform:uppercase; letter-spacing:.03em; }
+#info .conn{ background:var(--mb-surf-2); border:1px solid var(--mb-line); border-radius:var(--mb-r-md); padding:8px 10px; }
+
+/* Isolated view bar (filters) */
+#iso-panel{ border-bottom:1px solid var(--mb-line); box-shadow:var(--mb-sh); color:var(--mb-ink); gap:8px; padding:10px 14px; }
+/* Breadcrumb: previous steps purple, current ink. */
+#iso-panel .iso-focal{ font-weight:800; }
+#iso-panel .bc-crumb:not(.bc-current){ color:var(--mb-purple); }
+#iso-panel .bc-current{ color:var(--mb-ink); }
+#iso-panel .bc-more{ color:var(--mb-purple); }
+#iso-panel .bc-sep{ color:var(--mb-muted-2); }
+/* Counts in teal. */
+#iso-panel .iso-line-cols{ color:var(--mb-muted); }
+#iso-panel .iso-count{ color:var(--mb-teal); font-weight:800; }
+/* Search and dropdown: rounded, mint focus ring. */
+#iso-panel input[type="search"], #iso-panel select{
+  border:2px solid #eef2f4; border-radius:14px; background:var(--mb-surf-2);
+  color:#334155; font-weight:600; padding:8px 12px;
+}
+#iso-panel input[type="search"]:focus, #iso-panel select:focus{
+  outline:none; background:#fff; border-color:var(--mb-mint); box-shadow:0 0 0 4px var(--mb-mint-ring);
+}
+/* Chip toggles: the iso .tg become pills; checked = solid purple (via :has). */
+#iso-panel .tg{
+  border:1px solid var(--mb-line); border-radius:var(--mb-r-pill); background:#fff;
+  color:var(--mb-muted); font-weight:700; padding:7px 13px; gap:8px;
+}
+#iso-panel .tg:has(input:checked){ background:var(--mb-purple); color:#fff; border-color:var(--mb-purple); }
+#iso-panel .tg input[type="checkbox"]{
+  appearance:none; -webkit-appearance:none; margin:0; flex:0 0 auto; cursor:pointer;
+  width:14px; height:14px; border-radius:4px; border:2px solid currentColor; background:transparent;
+}
+#iso-panel .tg:has(input:checked) input[type="checkbox"]{ background:#fff; border-color:#fff; }
+/* Iso buttons: Fit ghost, Exit soft red, pill shaped. */
+#iso-panel .iso-btn{
+  border:1px solid var(--mb-line); border-radius:var(--mb-r-pill); background:#fff;
+  color:var(--mb-muted); font-weight:700; padding:7px 14px;
+}
+#iso-panel .iso-btn:hover{ background:var(--mb-surf-2); color:var(--mb-ink); }
+#iso-panel .iso-exit{ border-color:#f0cccc; background:#fdf3f3; color:#b4474a; }
+#iso-panel .iso-exit:hover{ background:#fbe9e9; }
+
+/* Toolbar: model identity block plus Layout button.
+   The bar is taller now, so the legend and popover move down to avoid overlap. */
+#legend{ top:58px; }
+#toolbar .tb-model{ display:flex; align-items:center; gap:10px; }
+#toolbar .tb-badge{ width:32px; height:32px; border-radius:10px; flex:0 0 auto;
+  display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg,var(--mb-purple),var(--mb-teal)); box-shadow:0 4px 12px rgba(106,48,108,.25); }
+#toolbar .tb-model-txt{ display:flex; flex-direction:column; align-items:flex-start; gap:4px; line-height:1.1; }
+#toolbar .tb-name{ font-weight:800; font-size:.92rem; color:var(--mb-ink); }
+/* Model select: a MINEBUGS pill like the filter dropdowns. It stays a native
+   <select>; we style the visible trigger and draw the arrow as an SVG background. */
+#toolbar #model-select{
+  appearance:none; -webkit-appearance:none; cursor:pointer;
+  max-width:300px; margin:0;
+  padding:7px 34px 7px 13px;                 /* room on the right for the arrow */
+  font-weight:700; font-size:.86rem; line-height:1.1; color:var(--mb-purple);
+  background-color:#fff;
+  border:1px solid rgba(106,48,108,.20); border-radius:14px;
+  box-shadow:var(--mb-sh-sm);
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236a306c' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat:no-repeat; background-position:right 12px center; background-size:12px;
+  transition:border-color .15s, box-shadow .15s;
+}
+#toolbar #model-select:hover{ border-color:rgba(106,48,108,.5); }
+#toolbar #model-select:focus{ outline:none; border-color:var(--mb-purple); box-shadow:0 0 0 3px rgba(106,48,108,.12); }
+/* Native option rows: dark text on white. */
+#toolbar #model-select option{ font-weight:600; color:var(--mb-ink); background:#fff; }
+#toolbar .tb-sub{ font-size:.66rem; color:var(--mb-muted-2); font-weight:600; padding-left:2px; }
+#toolbar .tb-divider{ width:1px; height:28px; background:var(--mb-line); }
+#toolbar .tb-spacer{ flex:1; }
+#toolbar .lay-btn{ display:inline-flex; align-items:center; gap:7px; cursor:pointer;
+  border:1px solid var(--mb-purple-100); background:var(--mb-purple-50); color:var(--mb-purple);
+  border-radius:var(--mb-r-pill); font-weight:700; padding:6px 14px; }
+#toolbar .lay-btn:hover{ background:#f3e8f4; }
+#toolbar .lay-btn .chev{ font-size:.7rem; transition:transform .2s; }
+#toolbar .lay-btn.open .chev{ transform:rotate(180deg); }
+
+/* Layout panel as a popover (dropdown from the Layout button). */
+#layout-panel{ display:none; top:64px; z-index:11; }   /* hidden by default, opened via .lay-open */
+#layout-panel.lay-open{ display:block; }
+
+/* Custom filter dropdown (MINEBUGS style, replacing the native select). */
+#iso-panel .msel{ position:relative; }
+#iso-panel .msel-trigger{ display:flex; align-items:center; justify-content:space-between; gap:10px;
+  min-width:200px; padding:8px 12px; cursor:pointer; background:#fff; color:var(--mb-purple);
+  border:1px solid rgba(106,48,108,.20); border-radius:14px; font-weight:700; font-size:.85rem; box-shadow:var(--mb-sh-sm); }
+#iso-panel .msel-trigger:hover{ border-color:rgba(106,48,108,.5); }
+#iso-panel .msel.open .msel-trigger{ border-color:var(--mb-purple); box-shadow:0 0 0 3px rgba(106,48,108,.10); }
+#iso-panel .msel-chev{ font-size:.7rem; color:rgba(106,48,108,.6); transition:transform .2s; }
+#iso-panel .msel.open .msel-chev{ transform:rotate(180deg); }
+#iso-panel .msel-menu{ display:none; position:absolute; top:calc(100% + 6px); left:0; min-width:100%; z-index:20;
+  background:#fff; border:1px solid rgba(106,48,108,.20); border-radius:14px; overflow:hidden auto; max-height:300px;
+  box-shadow:0 18px 40px rgba(106,48,108,.16); }
+#iso-panel .msel.open .msel-menu{ display:block; }
+#iso-panel .msel-sec{ padding:7px 14px; background:var(--mb-surf-2); border-bottom:1px solid var(--mb-line);
+  font-size:.62rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:rgba(106,48,108,.5); }
+#iso-panel .msel-item{ display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%;
+  padding:9px 14px; cursor:pointer; background:#fff; border:none; text-align:left;
+  font-size:.85rem; font-weight:700; color:var(--mb-purple); }
+#iso-panel .msel-item:hover{ background:rgba(106,48,108,.05); }
+#iso-panel .msel-item .tick{ visibility:hidden; color:var(--mb-purple); }
+#iso-panel .msel-item.sel .tick{ visibility:visible; }
+
+/* Community panel: counts marked with the node symbol. */
+#info .ctype{ color:var(--mb-muted); font-size:.8rem; margin:2px 0 12px; }
+#info .cstat{ display:flex; align-items:center; gap:11px; margin-bottom:8px;
+  padding:9px 11px; background:var(--mb-surf-2); border:1px solid var(--mb-line); border-radius:var(--mb-r-md); }
+#info .cstat-glyph{ width:18px; height:18px; flex:0 0 auto; border:1.5px solid #fff; box-shadow:0 0 0 1px #cbd5e1; }
+#info .cstat-rxn{ background:var(--mb-purple); border-radius:4px; }
+#info .cstat-met{ background:var(--mb-teal); border-radius:50%; }
+#info .cstat-num{ font-size:1.3rem; font-weight:800; line-height:1; }
+#info .cstat-what{ font-size:.82rem; color:var(--mb-muted); font-weight:600; }
