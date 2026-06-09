@@ -22,6 +22,7 @@ const COL_RXN = "#6a306c";     // purple (MINEBUGS): reactions
 const GREY    = "#c4c8cc";
 const LINK_COL = "#aab1b8", LINK_W = 1.0, LINK_OP = 0.4;
 const LINK_DIM = 0.04, NODE_DIM = 0.12;
+const SEARCH_LABEL_DELAY = 400;   // ms before match labels appear (debounce)
 const R_MIN = 4, R_MAX = 28;
 const TOP_LABELS = 24;         // label the most connected nodes
 const LABEL_MIN = 8;           // a block gets its subsystem label if it has at least this many reactions
@@ -62,6 +63,14 @@ const shorten = (s) => (s && s.length > 26) ? s.slice(0, 24) + "…" : (s || "?"
 const svg = d3.select("#graph");
 const info = d3.select("#info");
 const legendEl = d3.select("#legend");
+// The legend is a fixed strip BELOW the toolbar, but the toolbar height VARIES (wrapping rows, the
+// VIEW row, the search bar): measure its real height and place the legend just under it, otherwise
+// it gets covered by the toolbar. Recomputed on window resize too.
+function placeLegend() {
+  const tb = document.getElementById("toolbar");
+  if (tb) legendEl.style("top", (tb.getBoundingClientRect().height + 6) + "px");
+}
+window.addEventListener("resize", placeLegend);
 const W = window.innerWidth, H = window.innerHeight;
 const idOf = (ref) => (ref && ref.id != null ? ref.id : ref);
 
@@ -81,8 +90,8 @@ const overlayText = overlay.append("text")
   .attr("x", W / 2).attr("y", H / 2).attr("text-anchor", "middle")
   .style("font-size", "15px").style("fill", "#444").style("font-weight", "600")
   .text("Warming up the layout…");
-function showOverlay() { overlay.raise().style("display", null).style("opacity", 1); }
-function hideOverlay() { overlay.transition().duration(250).style("opacity", 0).on("end", () => overlay.style("display", "none")); }
+function showOverlay() { document.body.classList.add("loading"); overlay.raise().style("display", null).style("opacity", 1); }
+function hideOverlay() { document.body.classList.remove("loading"); overlay.transition().duration(250).style("opacity", 0).on("end", () => overlay.style("display", "none")); }
 
 
 // Model selection (#model-select dropdown).
@@ -160,7 +169,11 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
   links.forEach((l) => { outNbr.get(l.source).push(l.target); inNbr.get(l.target).push(l.source); });
   const topLabelled = new Set([...nodes].filter((n) => !n.currency).sort((a, b) => b.degree - a.degree).slice(0, TOP_LABELS).map((d) => d.id));
 
-  const ui  = { currency: false, labels: true, groupLabels: true, selected: null, community: null };
+  const ui  = { currency: true, labels: true, groupLabels: true, selected: null, community: null, search: "", searchLabels: false, searchMatch: false, labelId: false };
+  // Label text: node name or id, per the ui.labelId flag (shared by homepage and isolated view;
+  // labels are the same elements, so rewriting the text here updates both views).
+  const labelText = (d) => ui.labelId ? (d.id || d.name) : (d.name || d.id);
+  function applyLabelText() { labelSel.text(labelText); }
   const opt = { ...DEF };
 
   // Geometry: blocks sit around (cx,cy); the extracellular boundary is an outer
@@ -283,7 +296,7 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
     .attr("text-anchor", "middle").style("pointer-events", "none")
     .style("font-size", (d) => fontOf(d) + "px").style("font-weight", 700)
     .style("paint-order", "stroke").style("stroke", "white").style("stroke-width", 4).style("fill", "#222")
-    .style("display", "none").text((d) => d.name);
+    .style("display", "none").text(labelText);
 
   const glabelG = zoomG.append("g").style("pointer-events", "none");   // subsystem block labels
 
@@ -341,6 +354,9 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
     labelSel.style("display", (d) => {
       if (!ui.currency && d.currency) return "none";
       if (d.id === hovered) return null;
+      // Search with matches: show only match labels (debounced via searchLabels). With no match
+      // the network stays normal, so we skip this and the usual top-N labels apply.
+      if (ui.search && ui.searchMatch) return (ui.searchLabels && searchHit(d)) ? null : "none";
       if (ui.selected) return d.id === ui.selected ? null : "none";
       return (ui.labels && topLabelled.has(d.id)) ? null : "none";
     });
@@ -407,20 +423,95 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
 
   // Selection: a node (click) or a community (click on a label or button).
   function focusOnNode(d) {
+    // Dim non-neighbours via fill/stroke-opacity (NOT element opacity, which makes a compositing
+    // layer per node and lags pan/zoom). Non-incident links lose stroke opacity and arrowhead.
     const f = neighbors.get(d.id);
-    node.attr("opacity", (n) => (n.id === d.id || f.has(n.id)) ? 1 : NODE_DIM);
-    link.attr("opacity", (l) => (idOf(l.source) === d.id || idOf(l.target) === d.id) ? 1 : LINK_DIM);
+    const on = (n) => n.id === d.id || f.has(n.id);
+    node.attr("fill-opacity", (n) => on(n) ? 1 : NODE_DIM)
+        .attr("stroke-opacity", (n) => on(n) ? 1 : NODE_DIM);
+    const inc = (l) => idOf(l.source) === d.id || idOf(l.target) === d.id;
+    link.attr("stroke-opacity", (l) => inc(l) ? LINK_OP : LINK_DIM)
+        .attr("marker-end", (l) => inc(l) ? "url(#arrow)" : null);
   }
   // clearHighlight: clear both the node selection and the community selection.
   function clearHighlight() {
     ui.selected = null; ui.community = null;
-    node.attr("stroke", "#fff").attr("stroke-width", 1).attr("opacity", 1);
-    link.attr("opacity", 1);
+    // Reset fill/stroke-opacity and arrowheads too (null = inherit defaults).
+    node.attr("stroke", "#fff").attr("stroke-width", 1).attr("opacity", 1)
+        .attr("fill-opacity", null).attr("stroke-opacity", null);
+    link.attr("opacity", 1).attr("stroke-opacity", null).attr("marker-end", "url(#arrow)");
     commG.selectAll("*").remove();
     applyLabels();
     info.html('<span class="muted">Click a node, or a community label, to highlight it</span>');
   }
+
+  // searchHit: node matches the query (by name OR id, case-insensitive). Null-safe for link ends.
+  function searchHit(n) {
+    return !!n && (((n.name || "").toLowerCase().includes(ui.search)) ||
+                   ((n.id   || "").toLowerCase().includes(ui.search)));
+  }
+  // applySearch: highlight matching nodes (orange) and dim the rest via fill/stroke-opacity (no
+  // per-element compositing layer, so pan/zoom stays smooth); non-match links also drop the
+  // arrowhead. Match labels are handled by applyLabels via ui.searchLabels (debounced).
+  // Returns -1 if not searching, 0 if no match, else the number of visible matches.
+  function applySearch(q) {
+    ui.search = q;
+    if (!q) {
+      ui.searchLabels = false; ui.searchMatch = false;
+      resetSearchPaint();
+      hideNoMatch();
+      clearHighlight();
+      return -1;
+    }
+    ui.selected = null; ui.community = null; commG.selectAll("*").remove();
+    node.attr("opacity", 1).attr("stroke", "#fff").attr("stroke-width", 1);
+    link.attr("opacity", 1);
+    const m = nodes.filter((d) => searchHit(d) && (ui.currency || !d.currency)).length;
+    if (m === 0) {
+      // No match: keep the network normal (do not dim everything); the handler shows the tooltip.
+      ui.searchMatch = false;
+      resetSearchPaint();
+      applyLabels();
+      info.html(`<div class="title">Search</div><div class="ctype">no matching nodes</div>`);
+      return 0;
+    }
+    ui.searchMatch = true;
+    node.attr("fill", (n) => searchHit(n) ? MATCH_COL : colorOf(n))
+        .attr("fill-opacity", (n) => searchHit(n) ? 1 : NODE_DIM)
+        .attr("stroke-opacity", (n) => searchHit(n) ? 1 : NODE_DIM);
+    const linkHit = (l) => searchHit(byId.get(idOf(l.source))) && searchHit(byId.get(idOf(l.target)));
+    link.attr("stroke-opacity", (l) => linkHit(l) ? LINK_OP : LINK_DIM)
+        .attr("marker-end", (l) => linkHit(l) ? "url(#arrow)" : null);
+    applyLabels();
+    info.html(`<div class="title">Search</div><div class="ctype">${m} matching ${m === 1 ? "node" : "nodes"}</div>`);
+    return m;
+  }
+  // resetSearchPaint: restore the neutral look (type colours, full opacity, arrowheads back).
+  function resetSearchPaint() {
+    node.attr("fill", colorOf).attr("fill-opacity", null).attr("stroke-opacity", null);
+    link.attr("stroke-opacity", null).attr("marker-end", "url(#arrow)");
+  }
+  // No-match tooltip under the search bar; positioned from the input's bounding rect on show.
+  const searchTip = d3.select("#o-search-tip");
+  function showNoMatch() {
+    const el = document.getElementById("o-search");
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    searchTip.style("left", Math.round(r.left) + "px")
+             .style("top", Math.round(r.bottom + 6) + "px")
+             .style("display", "block");
+  }
+  function hideNoMatch() { searchTip.style("display", "none"); }
+  // clearSearchBox: empty the bar and drop the search highlight. No-op when not searching.
+  function clearSearchBox() {
+    if (!ui.search) return;
+    ui.search = ""; ui.searchLabels = false; ui.searchMatch = false;
+    d3.select("#o-search").property("value", "");
+    resetSearchPaint();
+    hideNoMatch();
+  }
   function selectNode(d) {
+    clearSearchBox();                                     // search and selection are exclusive
     ui.community = null; commG.selectAll("*").remove();   // leave community mode
     ui.selected = d.id;
     node.attr("stroke", (n) => n.id === d.id ? "#111" : "#fff").attr("stroke-width", (n) => n.id === d.id ? 2.5 : 1)
@@ -436,11 +527,18 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
   }
   function selectCommunity(s) {
     if (!subRxns.has(s)) return;
+    clearSearchBox();                          // search and community are exclusive
     ui.selected = null; ui.community = s;
     const { rxns, mets } = communityMembers(s);
     const member = new Set([...rxns.map((r) => r.id), ...mets]);
-    node.attr("stroke", "#fff").attr("stroke-width", 1).attr("opacity", (n) => member.has(n.id) ? 1 : NODE_DIM);
-    link.attr("opacity", (l) => (member.has(idOf(l.source)) && member.has(idOf(l.target))) ? 0.85 : LINK_DIM);
+    // Dim via fill/stroke-opacity (no element opacity): see focusOnNode/applySearch.
+    node.attr("stroke", "#fff").attr("stroke-width", 1).attr("opacity", 1)
+        .attr("fill-opacity", (n) => member.has(n.id) ? 1 : NODE_DIM)
+        .attr("stroke-opacity", (n) => member.has(n.id) ? 1 : NODE_DIM);
+    const inComm = (l) => member.has(idOf(l.source)) && member.has(idOf(l.target));
+    link.attr("opacity", 1)
+        .attr("stroke-opacity", (l) => inComm(l) ? LINK_OP : LINK_DIM)
+        .attr("marker-end", (l) => inComm(l) ? "url(#arrow)" : null);
     drawCommRect(rxns, s, rxns.length, mets.size);
     renderCommInfo(s, rxns, mets);
     applyLabels();
@@ -527,6 +625,7 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
     };
     item(COL_MET, "metabolite", false);
     item(COL_RXN, "reaction", true);
+    placeLegend();   // below the toolbar (variable height), so it isn't covered
   }
 
   // Light drag.
@@ -566,10 +665,33 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
     d3.select("body").on("keydown", (e) => { if (e.key === "Escape" && isolated) dismissIsolation(); });
 
     d3.select("#o-curr").on("change", function () { ui.currency = this.checked; applyCurrency(); applyLabels(); renderGroupLabels(); });
+    // Search bar: highlight matches live; match labels and the no-match tooltip are debounced.
+    let searchTimer = null;
+    d3.select("#o-search").on("input", function () {
+      const q = this.value.trim().toLowerCase();
+      ui.searchLabels = false;
+      hideNoMatch();
+      const m = applySearch(q);
+      clearTimeout(searchTimer);
+      if (q) searchTimer = setTimeout(() => {
+        ui.searchLabels = true; applyLabels();
+        if (m === 0) showNoMatch();
+      }, SEARCH_LABEL_DELAY);
+    });
     d3.select("#o-lbl").on("change", function () { ui.labels = this.checked; applyLabels(); });
     d3.select("#o-glbl").on("change", function () { ui.groupLabels = this.checked; glabelG.style("display", ui.groupLabels ? null : "none"); });
+    // Name/id label flag (homepage + isolated view); keeps the isolated twin in sync.
+    d3.select("#o-lblid").on("change", function () {
+      ui.labelId = this.checked;
+      d3.select("#iso-lblid").property("checked", this.checked);
+      applyLabelText();
+    });
     d3.select("#o-fit").on("click", () => fitView(true));
     d3.select("#reset").on("click", reset);
+    // Switch to the reaction-reaction projection of the same model: set the flag and reload
+    // (index.html's bootstrap will load reactions.js). Same page, like the model switch.
+    d3.select("#view-toggle").text("Reaction projection ▸")
+      .on("click", () => { sessionStorage.setItem("organized.view", "projection"); location.reload(); });
 
     const slider = (id, key, fmt) => d3.select(id).on("input", function () { opt[key] = +this.value; d3.select(id + "-v").text(fmt(this.value)); });
     slider("#op-cluster", "cluster", (v) => (+v).toFixed(2));
@@ -600,10 +722,11 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
 
   // Reset.
   function reset() {
-    ui.currency = false; ui.labels = true; ui.groupLabels = true;
-    d3.select("#o-curr").property("checked", false);
+    ui.currency = true; ui.labels = true; ui.groupLabels = true; ui.labelId = false;
+    d3.select("#o-curr").property("checked", true);
     d3.select("#o-lbl").property("checked", true);
     d3.select("#o-glbl").property("checked", true);
+    d3.select("#o-lblid").property("checked", false); applyLabelText();
     Object.assign(opt, DEF);
     d3.select("#op-cluster").property("value", DEF.cluster);   d3.select("#op-cluster-v").text(DEF.cluster.toFixed(2));
     d3.select("#op-charge").property("value", DEF.charge);     d3.select("#op-charge-v").text(DEF.charge);
@@ -611,6 +734,7 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
     d3.select("#op-boundary").property("value", DEF.boundary); d3.select("#op-boundary-v").text(DEF.boundary.toFixed(2));
     d3.select("#op-spacing").property("value", DEF.spacing);   d3.select("#op-spacing-v").text(DEF.spacing.toFixed(2));
     glabelG.style("display", null);
+    clearSearchBox();
     clearHighlight(); applyCurrency();
     recompute();
   }
@@ -651,6 +775,7 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
     rev:      d3.select("#iso-rev"),
     revWrap:  d3.select("#iso-rev-wrap"),
     sort:     d3.select("#iso-sort"),
+    lblId:    d3.select("#iso-lblid"),
     fit:      d3.select("#iso-fit"),
     exit:     d3.select("#iso-exit"),
   };
@@ -710,6 +835,10 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
     if (isolated) return;
     isolated = true;
     sim.stop();
+    // Clear any selection dimming (fill/stroke-opacity, dropped arrowheads): the isolated view
+    // shows/hides via element opacity, so nodes must start at full fill opacity.
+    node.attr("fill-opacity", null).attr("stroke-opacity", null);
+    link.attr("stroke-opacity", null).attr("marker-end", "url(#arrow)");
     isoSnapshot = new Map(nodes.map((n) => [n.id, { x: n.x, y: n.y }]));
     isoPath = [d];                 // the breadcrumb starts from the first focal
     isoPathExpanded = false;
@@ -816,11 +945,13 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
     isoEl.search.property("value", "");
     isoEl.rev.property("checked", false);
     isoEl.sort.property("checked", true);
+    isoEl.lblId.property("checked", ui.labelId);   // reflect the shared name/id flag
     // Events (each .on replaces the previous one: no buildup between isolations).
     isoEl.search.on("input", function () { isoState.search = this.value.trim().toLowerCase(); relayoutIso(420); });
     // (the filter selection is handled by the custom dropdown items, see buildGroupMenu and selectGroup)
     isoEl.rev.on("change", function () { isoState.revOnly = this.checked; relayoutIso(420); });
     isoEl.sort.on("change", function () { isoState.sortAlpha = this.checked; relayoutIso(420); });
+    isoEl.lblId.on("change", function () { ui.labelId = this.checked; d3.select("#o-lblid").property("checked", this.checked); applyLabelText(); });
     isoEl.fit.on("click", () => fitIsoColumns(true));
     isoEl.exit.on("click", dismissIsolation);
   }

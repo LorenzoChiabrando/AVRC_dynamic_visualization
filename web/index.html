@@ -6,15 +6,30 @@
 <head>
   <meta charset="utf-8" />
   <title>Metabolic network (organized) - D3</title>
-  <link rel="stylesheet" href="css/viewer.css" />
+  <link rel="stylesheet" href="css/viewer.css?v=2" />
   <style>
     #toolbar .page-title { font-weight: 700; color: #333; margin-right: 6px; }
     #legend { flex-wrap: wrap; }
+    /* Dedicated row for the bipartite/projection switch: flex-basis 100% wraps it to its own line. */
+    #view-row {
+      flex: 1 1 100%; display: flex; align-items: center; gap: 10px;
+      margin-top: 6px; padding: 7px 11px;
+      background: #faf7fd; border: 1px solid #e6dcef; border-left: 3px solid #8e5fd0; border-radius: 8px;
+    }
+    #view-row .view-row-label { font-weight: 700; color: #6a4f86; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+    /* Accent pill button; two IDs beat the theme's #toolbar button. */
+    #view-row #view-toggle {
+      padding: 6px 14px; font-size: 13px; font-weight: 600;
+      color: #5a2a6e; background: #fff; border: 1px solid #cdb6e0; border-radius: 999px;
+      cursor: pointer; transition: background .15s, border-color .15s, box-shadow .15s;
+    }
+    #view-row #view-toggle:hover { background: #f3e9fb; border-color: #8e5fd0; box-shadow: 0 0 0 3px rgba(142,95,208,.12); }
+    #view-row #view-toggle:active { background: #ece0f7; }
   </style>
   <!-- MINEBUGS theme loaded last so its overrides win over viewer.css. -->
-  <link rel="stylesheet" href="css/theme-minebugs.css?v=3" />
+  <link rel="stylesheet" href="css/theme-minebugs.css?v=4" />
 </head>
-<body>
+<body class="loading">
 
   <!-- Toolbar: model picker, currency and label toggles, layout, fit, reset. -->
   <header id="toolbar">
@@ -30,14 +45,27 @@
       </span>
     </div>
     <span class="tb-divider"></span>
-    <label class="tg"><input type="checkbox" id="o-curr" /> show currency</label>
+    <label class="tg"><input type="checkbox" id="o-curr" checked /> show currency</label>
     <label class="tg"><input type="checkbox" id="o-lbl" checked /> node labels</label>
     <label class="tg"><input type="checkbox" id="o-glbl" checked /> group labels</label>
+    <label class="tg" title="Label nodes by id instead of name"><input type="checkbox" id="o-lblid" /> label by id</label>
     <span class="tb-spacer"></span>
     <button id="lay-btn" class="lay-btn" type="button">Layout <span class="chev">▾</span></button>
     <button id="o-fit">fit to view</button>
     <button id="reset">reset</button>
+    <!-- Dedicated row: switch between the bipartite network and its reaction-reaction projection
+         (same page). The active script (organized.js or reactions.js) sets the button text/action;
+         a default text here keeps the control visible right away. -->
+    <div id="view-row">
+      <span class="view-row-label">View</span>
+      <button id="view-toggle" type="button" title="Switch between the bipartite network and its reaction-reaction projection">Reaction projection ▸</button>
+    </div>
+    <!-- Search bar: full-width second toolbar row (flex-basis 100% wraps it below the controls). -->
+    <input id="o-search" type="search" placeholder="search a node by name or id..." title="Highlight nodes whose name or id contains the text" />
   </header>
+
+  <!-- No-match tooltip, shown under the search bar (positioned by the JS). -->
+  <div id="o-search-tip">No matching nodes found</div>
 
   <!-- Legend, filled by the JS. -->
   <div id="legend"></div>
@@ -108,11 +136,22 @@
       </div>
       <label class="tg" id="iso-rev-wrap"><input type="checkbox" id="iso-rev" /> reversible only</label>
       <label class="tg"><input type="checkbox" id="iso-sort" checked /> sort A-Z</label>
+      <label class="tg" title="Label nodes by id instead of name"><input type="checkbox" id="iso-lblid" /> label by id</label>
     </div>
   </aside>
 
-  <!-- D3 v7 from the CDN, then our script. The ?v= is a cache buster. -->
+  <!-- D3 v7 from the CDN, then a small BOOTSTRAP: based on the sessionStorage flag
+       "organized.view" it loads the BIPARTITE viewer (organized.js) or the reaction-reaction
+       PROJECTION (reactions.js) in the SAME page. The #view-toggle button sets the flag and reloads. -->
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
-  <script src="js/organized.js?v=17"></script>
+  <script>
+    (function () {
+      var view = sessionStorage.getItem("organized.view") || "bipartite";
+      var src = (view === "projection") ? "js/reactions.js?v=1" : "js/organized.js?v=19";
+      var s = document.createElement("script");
+      s.src = src;
+      document.body.appendChild(s);
+    })();
+  </script>
 </body>
 </html>

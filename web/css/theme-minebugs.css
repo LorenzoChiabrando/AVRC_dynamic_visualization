@@ -93,6 +93,21 @@
 #iso-panel input[type="search"]:focus, #iso-panel select:focus{
   outline:none; background:#fff; border-color:var(--mb-mint); box-shadow:0 0 0 4px var(--mb-mint-ring);
 }
+
+/* Full-network search bar: same minebugs input look as the iso search. */
+#o-search{
+  border:2px solid #eef2f4; border-radius:14px; background:var(--mb-surf-2);
+  color:#334155; font-weight:600;
+}
+#o-search:focus{
+  outline:none; background:#fff; border-color:var(--mb-mint); box-shadow:0 0 0 4px var(--mb-mint-ring);
+}
+/* No-match tooltip: frosted surface with a purple accent edge. */
+#o-search-tip{
+  background:rgba(255,255,255,.98); border:1px solid var(--mb-line);
+  border-left:3px solid var(--mb-purple); border-radius:var(--mb-r-md);
+  box-shadow:var(--mb-sh-sm); color:var(--mb-muted); font-weight:600;
+}
 /* Chip toggles: the iso .tg become pills; checked = solid purple (via :has). */
 #iso-panel .tg{
   border:1px solid var(--mb-line); border-radius:var(--mb-r-pill); background:#fff;

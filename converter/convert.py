@@ -226,20 +226,27 @@ def convert_folder(src_dir: str | Path, out_dir: str | Path = DEFAULT_OUT_DIR,
     for mat in mat_files:
         try:
             model = load_model(mat)
-            payload = build_payload(model, drop_currency=drop_currency)
+            payload = build_payload(model, drop_currency=drop_currency)  # bipartite
+            rpayload = build_reaction_payload(model)                     # directed reaction projection
         except Exception as exc:  # skip a broken model, keep converting the rest
             print(f"[skip] {mat.name}: {exc}")
             continue
         out_file = out_dir / (mat.stem + ".json")
         with out_file.open("w") as f:
             json.dump(payload, f)
+        # Reaction projection of the SAME model, next to the bipartite: <stem>.reactions.json.
+        # Lets the bipartite viewer switch to the projection of the current model.
+        rxn_file = out_dir / (mat.stem + ".reactions.json")
+        with rxn_file.open("w") as f:
+            json.dump(rpayload, f)
         entries.append({
             "file": out_file.name,
+            "reactions": rxn_file.name,   # projection file for this model (data/<file>)
             "label": model_label(mat.stem),
             "nodes": len(payload["nodes"]),
             "links": len(payload["links"]),
         })
-        print(f"[all] {mat.name}: {len(payload['nodes'])} nodes, {len(payload['links'])} links -> {out_file.name}")
+        print(f"[all] {mat.name}: {len(payload['nodes'])} nodes, {len(payload['links'])} links -> {out_file.name} (+ {rxn_file.name})")
 
     entries.sort(key=lambda e: e["label"].lower())
 
