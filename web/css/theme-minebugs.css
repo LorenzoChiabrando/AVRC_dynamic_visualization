@@ -14,7 +14,7 @@
 }
 
 /* Shared surface for every panel: soft frosted glass. */
-#toolbar, #legend, #info, #layout-panel, #iso-panel{
+#toolbar, #legend, #info, #layout-panel, #iso-panel, #tools-panel{
   background:rgba(255,255,255,.88);
   backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
   border-color:var(--mb-line);
@@ -76,12 +76,39 @@
 
 /* Isolated view bar (filters) */
 #iso-panel{ border-bottom:1px solid var(--mb-line); box-shadow:var(--mb-sh); color:var(--mb-ink); gap:8px; padding:10px 14px; }
-/* Breadcrumb: previous steps purple, current ink. */
-#iso-panel .iso-focal{ font-weight:800; }
-#iso-panel .bc-crumb:not(.bc-current){ color:var(--mb-purple); }
-#iso-panel .bc-current{ color:var(--mb-ink); }
-#iso-panel .bc-more{ color:var(--mb-purple); }
-#iso-panel .bc-sep{ color:var(--mb-muted-2); }
+/* BREADCRUMB (focal path) as a SCROLLABLE strip of chips. The path can grow while navigating, so
+   instead of stretching or clipping, the bar keeps a fixed width (flex:1, min-width:0) and SCROLLS
+   horizontally. The JS scrolls it to the end after each render so the current focal stays visible. */
+#iso-panel .iso-focal{
+  flex:1; min-width:0;
+  display:flex; align-items:center; gap:3px; justify-content:flex-start;
+  overflow-x:auto; overflow-y:hidden; white-space:nowrap;
+  padding:3px 4px; margin:0 8px;
+  scrollbar-width:thin; scrollbar-color:var(--mb-line) transparent;
+}
+#iso-panel .iso-focal::-webkit-scrollbar{ height:6px; }
+#iso-panel .iso-focal::-webkit-scrollbar-thumb{ background:var(--mb-line); border-radius:999px; }
+#iso-panel .iso-focal::-webkit-scrollbar-track{ background:transparent; }
+/* Each step is a pill chip. Previous steps are clickable (purple), the current one is filled. */
+#iso-panel .bc-crumb{
+  flex:0 0 auto; max-width:150px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  padding:3px 10px; border-radius:var(--mb-r-pill); font-size:12px; font-weight:700; line-height:1.4;
+  background:var(--mb-surf-2); border:1px solid var(--mb-line);
+}
+#iso-panel .bc-crumb:not(.bc-current){ color:var(--mb-purple); cursor:pointer; }
+#iso-panel .bc-crumb:not(.bc-current):hover{ background:#f3e8f4; border-color:rgba(106,48,108,.35); text-decoration:none; }
+#iso-panel .bc-current{ color:#fff; background:var(--mb-purple); border-color:var(--mb-purple); }
+/* Separator and "..." (expand the middle of the path): small, matching the chips. */
+#iso-panel .bc-sep{ flex:0 0 auto; color:var(--mb-muted-2); font-weight:400; margin:0; }
+#iso-panel .bc-more{
+  flex:0 0 auto; cursor:pointer; color:var(--mb-purple); font-weight:800;
+  padding:3px 9px; border-radius:var(--mb-r-pill); background:var(--mb-surf-2); border:1px solid var(--mb-line);
+}
+#iso-panel .bc-more:hover{ background:#f3e8f4; border-color:rgba(106,48,108,.35); text-decoration:none; }
+/* Dedicated path row (below the Exit/Fit buttons): full width, separated by a thin line. */
+#iso-panel .iso-line-path{ padding-top:7px; border-top:1px solid var(--mb-line); }
+#iso-panel .iso-line-path .iso-focal{ margin:0; }
 /* Counts in teal. */
 #iso-panel .iso-line-cols{ color:var(--mb-muted); }
 #iso-panel .iso-count{ color:var(--mb-teal); font-weight:800; }
@@ -129,8 +156,14 @@
 #iso-panel .iso-exit:hover{ background:#fbe9e9; }
 
 /* Toolbar: model identity block plus Layout button.
-   The bar is taller now, so the legend and popover move down to avoid overlap. */
-#legend{ top:58px; }
+   The bar is taller now, so the Layout popover moves down to avoid overlap. */
+/* LEGEND moved to the BOTTOM-RIGHT: a small pill in the corner, no longer a top strip. Overrides
+   viewer.css (left:0;right:0;top:44px); placeLegend no longer sets an inline top. */
+#legend{
+  top:auto; left:auto; bottom:14px; right:14px; width:auto;
+  border:1px solid var(--mb-line); border-radius:var(--mb-r-md);
+  padding:8px 13px; box-shadow:var(--mb-sh); gap:8px 14px;
+}
 #toolbar .tb-model{ display:flex; align-items:center; gap:10px; }
 #toolbar .tb-badge{ width:32px; height:32px; border-radius:10px; flex:0 0 auto;
   display:flex; align-items:center; justify-content:center;
@@ -168,6 +201,42 @@
 /* Layout panel as a popover (dropdown from the Layout button). */
 #layout-panel{ display:none; top:64px; z-index:11; }   /* hidden by default, opened via .lay-open */
 #layout-panel.lay-open{ display:block; }
+
+/* "Search & view" button and popover. */
+/* Purple pill like the Layout button (the lens is an inline SVG inheriting currentColor). */
+#toolbar .tools-btn{ display:inline-flex; align-items:center; gap:7px; cursor:pointer;
+  border:1px solid var(--mb-purple-100); background:var(--mb-purple-50); color:var(--mb-purple);
+  border-radius:var(--mb-r-pill); font-weight:700; padding:6px 14px; }
+#toolbar .tools-btn:hover{ background:#f3e8f4; border-color:rgba(106,48,108,.5); color:var(--mb-purple); }
+#toolbar .tools-btn svg{ flex:0 0 auto; }
+#toolbar .tools-btn .chev{ font-size:.7rem; transition:transform .2s; }
+#toolbar .tools-btn.open .chev{ transform:rotate(180deg); }
+
+/* Popover: floating card top-right, hidden until the button adds .tools-open. */
+#tools-panel{
+  display:none; position:fixed; top:64px; right:12px; z-index:11;
+  width:300px; padding:14px;
+  border:1px solid var(--mb-line); border-radius:var(--mb-r-lg); box-shadow:var(--mb-sh);
+}
+#tools-panel.tools-open{ display:block; }
+/* Search bar inside the popover: full card width, mint focus like the isolated view. */
+#tools-panel #o-search{
+  box-sizing:border-box; width:100%; margin:0;
+  border:2px solid #eef2f4; border-radius:14px; background:var(--mb-surf-2);
+  color:#334155; font-weight:600; padding:9px 13px; font-size:14px;
+}
+#tools-panel #o-search:focus{
+  outline:none; background:#fff; border-color:var(--mb-mint); box-shadow:0 0 0 4px var(--mb-mint-ring);
+}
+/* "View" row: label plus the button that switches to the reaction-reaction projection. */
+#tools-panel .tools-view{ display:flex; align-items:center; gap:10px; margin-top:12px;
+  padding-top:12px; border-top:1px solid var(--mb-line); }
+#tools-panel .tools-view-label{ font-weight:800; font-size:11px; color:var(--mb-muted);
+  text-transform:uppercase; letter-spacing:.06em; }
+#tools-panel #view-toggle{ flex:1; cursor:pointer; padding:8px 14px;
+  border:1px solid var(--mb-purple-100); background:var(--mb-purple-50); color:var(--mb-purple);
+  border-radius:14px; font-weight:700; font-size:13px; transition:background .15s, border-color .15s; }
+#tools-panel #view-toggle:hover{ background:#f3e8f4; border-color:var(--mb-purple); }
 
 /* Custom filter dropdown (MINEBUGS style, replacing the native select). */
 #iso-panel .msel{ position:relative; }

@@ -7,27 +7,14 @@
   <meta charset="utf-8" />
   <title>Metabolic network (organized) - D3</title>
   <link rel="stylesheet" href="css/viewer.css?v=2" />
+  <!-- Styles for the "Search & view" button and its popover live in theme-minebugs.css, next to the
+       "Layout" popover whose mechanism they share. -->
   <style>
     #toolbar .page-title { font-weight: 700; color: #333; margin-right: 6px; }
     #legend { flex-wrap: wrap; }
-    /* Dedicated row for the bipartite/projection switch: flex-basis 100% wraps it to its own line. */
-    #view-row {
-      flex: 1 1 100%; display: flex; align-items: center; gap: 10px;
-      margin-top: 6px; padding: 7px 11px;
-      background: #faf7fd; border: 1px solid #e6dcef; border-left: 3px solid #8e5fd0; border-radius: 8px;
-    }
-    #view-row .view-row-label { font-weight: 700; color: #6a4f86; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
-    /* Accent pill button; two IDs beat the theme's #toolbar button. */
-    #view-row #view-toggle {
-      padding: 6px 14px; font-size: 13px; font-weight: 600;
-      color: #5a2a6e; background: #fff; border: 1px solid #cdb6e0; border-radius: 999px;
-      cursor: pointer; transition: background .15s, border-color .15s, box-shadow .15s;
-    }
-    #view-row #view-toggle:hover { background: #f3e9fb; border-color: #8e5fd0; box-shadow: 0 0 0 3px rgba(142,95,208,.12); }
-    #view-row #view-toggle:active { background: #ece0f7; }
   </style>
   <!-- MINEBUGS theme loaded last so its overrides win over viewer.css. -->
-  <link rel="stylesheet" href="css/theme-minebugs.css?v=4" />
+  <link rel="stylesheet" href="css/theme-minebugs.css?v=5" />
 </head>
 <body class="loading">
 
@@ -53,16 +40,24 @@
     <button id="lay-btn" class="lay-btn" type="button">Layout <span class="chev">▾</span></button>
     <button id="o-fit">fit to view</button>
     <button id="reset">reset</button>
-    <!-- Dedicated row: switch between the bipartite network and its reaction-reaction projection
-         (same page). The active script (organized.js or reactions.js) sets the button text/action;
-         a default text here keeps the control visible right away. -->
-    <div id="view-row">
-      <span class="view-row-label">View</span>
+    <!-- "Search & view" button: toggles the #tools-panel popover (below) with the search bar and the
+         view switch. Same mechanism as the "Layout" button. The lens is an inline SVG. -->
+    <button id="tools-btn" class="tools-btn" type="button" title="Show search and view options">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      Search &amp; view <span class="chev">▾</span>
+    </button>
+  </header>
+
+  <!-- "Search & view" popover: hidden by default, opened by #tools-btn (.tools-open, handled in JS
+       like the Layout popover). Holds the search bar (#o-search) and the view switch (#view-toggle);
+       the active script sets the button text and action. -->
+  <aside id="tools-panel" aria-label="search and view options">
+    <input id="o-search" type="search" placeholder="search a node by name or id..." title="Highlight nodes whose name or id contains the text" />
+    <div class="tools-view">
+      <span class="tools-view-label">View</span>
       <button id="view-toggle" type="button" title="Switch between the bipartite network and its reaction-reaction projection">Reaction projection ▸</button>
     </div>
-    <!-- Search bar: full-width second toolbar row (flex-basis 100% wraps it below the controls). -->
-    <input id="o-search" type="search" placeholder="search a node by name or id..." title="Highlight nodes whose name or id contains the text" />
-  </header>
+  </aside>
 
   <!-- No-match tooltip, shown under the search bar (positioned by the JS). -->
   <div id="o-search-tip">No matching nodes found</div>
@@ -121,8 +116,11 @@
   <aside id="iso-panel" aria-label="isolated node view">
     <div class="iso-line iso-line-top">
       <button id="iso-exit" class="iso-btn iso-exit" title="Leave the isolated view (or press Esc)">Exit isolated view</button>
-      <span class="iso-focal" id="iso-focal-name">-</span>
       <button id="iso-fit" class="iso-btn" title="Frame all the neighbours currently shown">Fit to view</button>
+    </div>
+    <!-- Path (breadcrumb) on its OWN full-width row, horizontally scrollable. -->
+    <div class="iso-line iso-line-path">
+      <span class="iso-focal" id="iso-focal-name">-</span>
     </div>
     <div class="iso-line iso-line-cols">
       <span class="iso-col iso-col-in"><b id="iso-head-in">INPUT</b> <span class="iso-count" id="iso-count-in">0 / 0</span></span>
@@ -147,7 +145,7 @@
   <script>
     (function () {
       var view = sessionStorage.getItem("organized.view") || "bipartite";
-      var src = (view === "projection") ? "js/reactions.js?v=1" : "js/organized.js?v=19";
+      var src = (view === "projection") ? "js/reactions.js?v=2" : "js/organized.js?v=20";
       var s = document.createElement("script");
       s.src = src;
       document.body.appendChild(s);

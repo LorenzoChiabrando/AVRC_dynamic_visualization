@@ -14,7 +14,7 @@
     #legend { flex-wrap: wrap; }
   </style>
   <!-- MINEBUGS theme loaded last so its overrides win over viewer.css. -->
-  <link rel="stylesheet" href="css/theme-minebugs.css?v=4" />
+  <link rel="stylesheet" href="css/theme-minebugs.css?v=5" />
 </head>
 <body class="loading">
 
@@ -86,8 +86,11 @@
   <aside id="iso-panel" aria-label="isolated node view">
     <div class="iso-line iso-line-top">
       <button id="iso-exit" class="iso-btn iso-exit" title="Leave the isolated view (or press Esc)">Exit isolated view</button>
-      <span class="iso-focal" id="iso-focal-name">-</span>
       <button id="iso-fit" class="iso-btn" title="Frame all the neighbours currently shown">Fit to view</button>
+    </div>
+    <!-- Path (breadcrumb) on its OWN full-width row, horizontally scrollable. -->
+    <div class="iso-line iso-line-path">
+      <span class="iso-focal" id="iso-focal-name">-</span>
     </div>
     <div class="iso-line iso-line-cols">
       <span class="iso-col iso-col-in"><b id="iso-head-in">UPSTREAM</b> <span class="iso-count" id="iso-count-in">0 / 0</span></span>
@@ -106,6 +109,6 @@
   </aside>
 
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
-  <script src="js/reactions.js?v=1"></script>
+  <script src="js/reactions.js?v=2"></script>
 </body>
 </html>

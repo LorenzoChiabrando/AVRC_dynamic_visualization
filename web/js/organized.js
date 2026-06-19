@@ -28,13 +28,20 @@ const TOP_LABELS = 24;         // label the most connected nodes
 const LABEL_MIN = 8;           // a block gets its subsystem label if it has at least this many reactions
 const ARROW_COL = "#7a828b";
 const MATCH_COL = "#6ef1c7";   // mint (MINEBUGS): highlight accent (community frame and focal ring)
+// Search "beacon": when the network is fit to screen the nodes are tiny and matches get lost. Matches
+// are drawn at a minimum on-screen size (SEARCH_BEACON_R px, counter-scaled by 1/k) with a dark ring
+// (SEARCH_RING_W px on screen). Zooming in returns them to their natural size.
+const SEARCH_BEACON_R = 15;    // minimum on-screen radius (px) of a matched node
+const SEARCH_RING_W   = 2.5;   // ring thickness (px on screen)
+const SEARCH_RING_COL = "#2f474a";  // dark teal: high-contrast rim around the mint match
+const SEARCH_LABEL_MIN = 13;   // minimum on-screen size (px) of a match label
 const ISO_DUR   = 800;         // isolate and return animation duration (ms)
 
 // Isolated view (ego network) parameters in one place: column geometry, label
 // spacing to avoid overlap, and node radii in the dedicated view.
 const ISO = {
   rowH:     30,   // vertical step between rows of a column (px)
-  panelTop: 128,  // space above the columns for the #iso-panel bar
+  panelTop: 170,  // space above the columns for the #iso-panel bar (4 rows: buttons, path, counts, filters)
   botPad:   56,   // space below the columns
   colFrac: 0.30,  // column distance from the focal as a fraction of window width...
   colMax:  420,   // ...capped in px so columns do not run off on wide screens
@@ -63,14 +70,10 @@ const shorten = (s) => (s && s.length > 26) ? s.slice(0, 24) + "…" : (s || "?"
 const svg = d3.select("#graph");
 const info = d3.select("#info");
 const legendEl = d3.select("#legend");
-// The legend is a fixed strip BELOW the toolbar, but the toolbar height VARIES (wrapping rows, the
-// VIEW row, the search bar): measure its real height and place the legend just under it, otherwise
-// it gets covered by the toolbar. Recomputed on window resize too.
-function placeLegend() {
-  const tb = document.getElementById("toolbar");
-  if (tb) legendEl.style("top", (tb.getBoundingClientRect().height + 6) + "px");
-}
-window.addEventListener("resize", placeLegend);
+// The legend is now anchored bottom-right via CSS (theme-minebugs), no longer a strip under the
+// toolbar. placeLegend stays because renderLegend calls it, but it no longer sets top (an inline top
+// would break the bottom anchoring). It is a documented no-op.
+function placeLegend() { /* position handled by CSS */ }
 const W = window.innerWidth, H = window.innerHeight;
 const idOf = (ref) => (ref && ref.id != null ? ref.id : ref);
 
@@ -442,7 +445,9 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
     link.attr("opacity", 1).attr("stroke-opacity", null).attr("marker-end", "url(#arrow)");
     commG.selectAll("*").remove();
     applyLabels();
-    info.html('<span class="muted">Click a node, or a community label, to highlight it</span>');
+    // Empty state: no generic message box. Clear and HIDE #info; it reappears only when filled by a
+    // selection, a search, or a community (those paths set display back).
+    info.html("").style("display", "none");
   }
 
   // searchHit: node matches the query (by name OR id, case-insensitive). Null-safe for link ends.
@@ -472,25 +477,70 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
       ui.searchMatch = false;
       resetSearchPaint();
       applyLabels();
-      info.html(`<div class="title">Search</div><div class="ctype">no matching nodes</div>`);
+      info.style("display", null).html(`<div class="title">Search</div><div class="ctype">no matching nodes</div>`);
       return 0;
     }
     ui.searchMatch = true;
     node.attr("fill", (n) => searchHit(n) ? MATCH_COL : colorOf(n))
         .attr("fill-opacity", (n) => searchHit(n) ? 1 : NODE_DIM)
         .attr("stroke-opacity", (n) => searchHit(n) ? 1 : NODE_DIM);
+    // Keep the (few) visible matches as their own selection and enlarge them at the current zoom, so
+    // the zoom handler resizes only these nodes instead of scanning all of them (see sizeSearchHits).
+    searchHitsSel = node.filter((n) => searchHit(n) && (ui.currency || !n.currency));
+    searchLabelSel = labelSel.filter((n) => searchHit(n) && (ui.currency || !n.currency));
+    sizeSearchHits();
     const linkHit = (l) => searchHit(byId.get(idOf(l.source))) && searchHit(byId.get(idOf(l.target)));
     link.attr("stroke-opacity", (l) => linkHit(l) ? LINK_OP : LINK_DIM)
         .attr("marker-end", (l) => linkHit(l) ? "url(#arrow)" : null);
     applyLabels();
-    info.html(`<div class="title">Search</div><div class="ctype">${m} matching ${m === 1 ? "node" : "nodes"}</div>`);
+    info.style("display", null).html(`<div class="title">Search</div><div class="ctype">${m} matching ${m === 1 ? "node" : "nodes"}</div>`);
     return m;
   }
-  // resetSearchPaint: restore the neutral look (type colours, full opacity, arrowheads back).
+  // resetSearchPaint: restore the neutral look (type colours, full opacity, arrowheads back), and also
+  // the natural node size and 1px white stroke, clearing any previous match "beacon". Labels go back to
+  // natural font, halo and position. One-shot (on clear or no match), not per-frame.
   function resetSearchPaint() {
-    node.attr("fill", colorOf).attr("fill-opacity", null).attr("stroke-opacity", null);
+    node.attr("fill", colorOf).attr("fill-opacity", null).attr("stroke-opacity", null)
+        .attr("d", symbolGen).attr("stroke", "#fff").attr("stroke-width", 1);
+    labelSel.style("font-size", (d) => fontOf(d) + "px").style("stroke-width", 4)
+            .attr("y", (d) => d.y - rOf(d) - 6);
     link.attr("stroke-opacity", null).attr("marker-end", "url(#arrow)");
+    searchHitsSel = null; searchLabelSel = null; sizedK = null;
   }
+
+  // Match beacon and zoom state.
+  let curK = 1;                 // current zoom factor (updated by onZoom)
+  let sizedK = null;            // last k the matches were sized at (skips work during pan)
+  let searchHitsSel = null;     // D3 selection of matched nodes (few: resized quickly)
+  let searchLabelSel = null;    // D3 selection of match labels (enlarged with the nodes)
+  // Beacon shape: same as the node (circle metabolite / square reaction), variable size.
+  const beaconGen = d3.symbol().type((d) => d.kind === "reaction" ? d3.symbolSquare : d3.symbolCircle);
+  // World radius that on screen (x curK) is at least SEARCH_BEACON_R px, never below the natural size:
+  // large when fit to screen (small k), natural when zoomed in.
+  const beaconR = (d) => Math.max(rOf(d), SEARCH_BEACON_R / curK);
+  // sizeSearchHits: resize only the matches at the current k. Called by applySearch and by onZoom.
+  function sizeSearchHits() {
+    if (!ui.searchMatch || !searchHitsSel) return;
+    sizedK = curK;
+    searchHitsSel
+      .attr("d", (d) => beaconGen.size(Math.PI * beaconR(d) * beaconR(d))(d))
+      .attr("stroke", SEARCH_RING_COL)
+      .attr("stroke-width", SEARCH_RING_W / curK);   // ring roughly constant on screen
+    // Match labels: readable text (at least SEARCH_LABEL_MIN px on screen), near-constant white halo,
+    // placed ABOVE the enlarged beacon so it does not sit inside the node.
+    if (searchLabelSel) searchLabelSel
+      .style("font-size", (d) => Math.max(fontOf(d), SEARCH_LABEL_MIN / curK) + "px")
+      .style("stroke-width", 4 / curK)
+      .attr("y", (d) => d.y - beaconR(d) - 4 / curK);
+  }
+  // onZoom: apply the transform (like the base handler) and, if a search is active, rescale the
+  // matches at the new zoom. Replaces the minimal handler set when `zoom` was created.
+  function onZoom(e) {
+    zoomG.attr("transform", e.transform);
+    curK = e.transform.k;
+    if (ui.searchMatch && curK !== sizedK) sizeSearchHits();
+  }
+  zoom.on("zoom", onZoom);
   // No-match tooltip under the search bar; positioned from the input's bounding rect on show.
   const searchTip = d3.select("#o-search-tip");
   function showNoMatch() {
@@ -560,7 +610,7 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
   }
   function renderCommInfo(s, rxns, mets) {
     // Compact format: title plus two "node glyph and number" rows (no name lists).
-    info.html(
+    info.style("display", null).html(
       `<div class="title">${esc(s)}</div>` +
       `<div class="ctype">community · subsystem</div>` +
       `<div class="cstat"><span class="cstat-glyph cstat-rxn"></span>` +
@@ -603,7 +653,7 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
     const ds = dominantSub(d);
     const focusBtn = `<button class="info-action" id="info-open" title="Open this node's detailed isolated view (focal with inputs/outputs and drill-down) in a dedicated window">Open detailed view</button>`;
     const commBtn = ds ? `<button class="info-action" id="info-comm" title="Highlight this node's community (${esc(ds)})">Highlight community</button>` : "";
-    info.html(
+    info.style("display", null).html(
       `<div class="title">${esc(d.name || d.id)}</div>${focusBtn}${commBtn}` +
       `<dl><dt>id</dt><dd>${esc(d.id)}</dd>` +
       `<dt>type</dt><dd>${d.kind === "reaction" ? "reaction" : "metabolite"}</dd>` +
@@ -665,19 +715,25 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
     d3.select("body").on("keydown", (e) => { if (e.key === "Escape" && isolated) dismissIsolation(); });
 
     d3.select("#o-curr").on("change", function () { ui.currency = this.checked; applyCurrency(); applyLabels(); renderGroupLabels(); });
-    // Search bar: highlight matches live; match labels and the no-match tooltip are debounced.
-    let searchTimer = null;
-    d3.select("#o-search").on("input", function () {
-      const q = this.value.trim().toLowerCase();
-      ui.searchLabels = false;
-      hideNoMatch();
+    // Search on CONFIRM: highlighting and enlarging matches happens only on Enter, not on every
+    // keystroke, so typing "b" does not light up half the network. While typing the graph is left
+    // untouched; clearing the field resets the search.
+    function runSearch(q) {
       const m = applySearch(q);
-      clearTimeout(searchTimer);
-      if (q) searchTimer = setTimeout(() => {
-        ui.searchLabels = true; applyLabels();
-        if (m === 0) showNoMatch();
-      }, SEARCH_LABEL_DELAY);
-    });
+      if (q) { ui.searchLabels = true; applyLabels(); if (m === 0) showNoMatch(); }
+      else hideNoMatch();
+    }
+    d3.select("#o-search")
+      .on("input", function () {
+        hideNoMatch();
+        if (!this.value.trim() && ui.searchMatch) runSearch("");
+      })
+      .on("keydown", function (e) {
+        if (e.key === "Enter") { e.preventDefault(); runSearch(this.value.trim().toLowerCase()); }
+      })
+      .on("search", function () {
+        if (!this.value.trim()) runSearch("");
+      });
     d3.select("#o-lbl").on("change", function () { ui.labels = this.checked; applyLabels(); });
     d3.select("#o-glbl").on("change", function () { ui.groupLabels = this.checked; glabelG.style("display", ui.groupLabels ? null : "none"); });
     // Name/id label flag (homepage + isolated view); keeps the isolated twin in sync.
@@ -707,14 +763,36 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
       panel.classed("lay-open", open);
       d3.select(this).classed("open", open);
     });
+    // closeToolsPanel: close the "Search & view" popover AND clear the search. Closing the popover
+    // must not leave a search active, otherwise beacons and labels stay on a hidden query. clearSearchBox
+    // is a no-op when nothing was being searched.
+    function closeToolsPanel() {
+      d3.select("#tools-panel").classed("tools-open", false);
+      d3.select("#tools-btn").classed("open", false);
+      if (ui.search) { clearSearchBox(); applyLabels(); }
+    }
+    // "Search & view" button: open the popover (focusing the input) or close it and clear the search.
+    d3.select("#tools-btn").on("click", function () {
+      const willOpen = !d3.select("#tools-panel").classed("tools-open");
+      if (willOpen) {
+        d3.select("#tools-panel").classed("tools-open", true);
+        d3.select(this).classed("open", true);
+        setTimeout(() => { const s = document.getElementById("o-search"); if (s) s.focus(); }, 0);
+      } else {
+        closeToolsPanel();
+      }
+    });
     // Trigger of the custom filter dropdown (isolated view): open and close the menu.
     isoEl.groupTrigger.on("click", () => { isoEl.group.classed("open", !isoEl.group.classed("open")); });
-    // Click outside: close the layout popover and the filter dropdown.
+    // Click outside: close the popovers (layout, search & view) and the filter dropdown.
     d3.select(document).on("click.popovers", (ev) => {
       const t = ev.target;
       if (t.closest && !t.closest("#lay-btn") && !t.closest("#layout-panel")) {
         d3.select("#layout-panel").classed("lay-open", false);
         d3.select("#lay-btn").classed("open", false);
+      }
+      if (t.closest && !t.closest("#tools-btn") && !t.closest("#tools-panel")) {
+        if (d3.select("#tools-panel").classed("tools-open")) closeToolsPanel();
       }
       if (t.closest && !t.closest("#iso-group")) isoEl.group.classed("open", false);
     });
@@ -859,6 +937,8 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
     d3.select("#toolbar").style("display", "none");
     d3.select("#legend").style("display", "none");
     d3.select("#layout-panel").classed("lay-open", false);   // close the layout popover on entering
+    d3.select("#tools-panel").classed("tools-open", false);  // ...and the "Search & view" popover
+    d3.select("#tools-btn").classed("open", false);
     info.style("display", "none");
     glabelG.style("display", "none");   // hide the subsystem labels (organized specific layer)
     commG.selectAll("*").remove();      // drop any community rectangle
@@ -1010,6 +1090,9 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
         .text(n.name || n.id);
       if (!isLast) c.on("click", (ev) => { ev.stopPropagation(); jumpTo(i); });
     });
+    // Scroll to the end so the last chip (current focal) stays visible; older steps scroll left.
+    const elNode = el.node();
+    if (elNode) elNode.scrollLeft = elNode.scrollWidth;
   }
 
   // isoFilteredSorted: apply the current filters (search, dropdown, reversible) and
@@ -1120,15 +1203,19 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
   // fitIsoColumns: frame the currently shown nodes (focal plus filtered neighbours),
   // with wide side margins for the labels. Called by the "Fit to view" button.
   function fitIsoColumns(animate) {
-    if (!isoShownSet) return;
+    if (!isoShownSet || !isoState) return;
     const vis = nodes.filter((n) => isoShownSet.has(n.id));
     if (!vis.length) return;
     const xs = vis.map((n) => n.x), ys = vis.map((n) => n.y);
-    const x0 = d3.min(xs) - 230, x1 = d3.max(xs) + 230;   // room for the side labels
+    // Horizontal centre = the FOCAL (not the bounding box): if one column is fuller or longer than the
+    // other, the focal still ends up centred on screen (like on entry). Use a half-width that is
+    // SYMMETRIC around the focal plus a margin for the side labels.
+    const fx = isoState.focal.x;
+    const halfX = Math.max(fx - d3.min(xs), d3.max(xs) - fx) + 230;
     const y0 = d3.min(ys) - 40,  y1 = d3.max(ys) + 50;
-    const gw = (x1 - x0) || 1, gh = (y1 - y0) || 1, pad = 24, top = ISO.panelTop;
+    const gw = (2 * halfX) || 1, gh = (y1 - y0) || 1, pad = 24, top = ISO.panelTop;
     const k = Math.max(0.04, Math.min((W - 2 * pad) / gw, (H - top - 2 * pad) / gh, 1.6));
-    const tx = (W - k * (x0 + x1)) / 2;
+    const tx = W / 2 - k * fx;                            // focal ends at the horizontal centre
     const ty = top + (H - top - k * (y0 + y1)) / 2;
     const target = d3.zoomIdentity.translate(tx, ty).scale(k);
     if (animate) svg.transition().duration(450).call(zoom.transform, target);
@@ -1202,7 +1289,8 @@ resolveDataset().then((file) => d3.json("data/" + file)).then((raw) => {
       d3.select("#toolbar").style("display", null);
       d3.select("#legend").style("display", null);
       d3.select("#layout-panel").classed("lay-open", false);   // stays closed on leaving isolation
-      info.style("display", null);
+      // No generic box on leaving: clear and hide #info; selectNode(focal) below refills and shows it.
+      info.html("").style("display", "none");
       isoEl.panel.style("display", "none");
       glabelG.style("display", ui.groupLabels ? null : "none");   // restore the subsystem labels
       isoShownSet = null; isoRadiusMap = null; isoSnapshot = null; isoFocal = null; isoState = null;
