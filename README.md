@@ -6,10 +6,12 @@ pages render that JSON in the browser. No build step and no backend.
 
 ## Layout
 
-    converter/convert.py   converter from .mat to graph JSON
+    converter/             .mat to graph JSON: convert.py (CLI) + cobra_io, graphs, batch
     data/raw/              raw COBRA .mat models
-    web/                   browser pages (HTML, CSS, JS)
-    web/data/              graph JSON read by the viewers
+    web/index.html         the single page: organized view + reaction-projection toggle
+    web/js/                ES modules: config, util, data/, core/, views/
+    web/css/               viewer.css plus the MINEBUGS theme
+    web/data/              graph JSON read by the viewer
 
 ## Run the viewer
 
@@ -21,9 +23,8 @@ Serve the `web` folder and open it in a browser. This needs no extra packages,
 
 Then open the pages:
 
-    http://localhost:8000/                  organized view (subsystem blocks, isolated node view)
-    http://localhost:8000/index-base.html   base bipartite view
-    http://localhost:8000/reactions.html    reaction to reaction projection
+    http://localhost:8000/                  organized view (subsystem blocks, isolated node view);
+                                            "Search & view" toggles the reaction-reaction projection
 
 ## Regenerate the data (optional)
 

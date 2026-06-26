@@ -1,7 +1,6 @@
-/* theme-minebugs.css: MINEBUGS theme for the organized viewer.
-   Loaded after viewer.css by index.html and organized.html only; the overrides
-   reuse viewer.css selectors and win by load order. The base page
-   (index-base.html) loads viewer.css alone and keeps its original look.
+/* theme-minebugs.css: MINEBUGS theme for the viewer.
+   Loaded after viewer.css by index.html; the overrides reuse viewer.css selectors
+   and win by load order.
    Needs a modern browser (:has(), accent-color, appearance). */
 
 :root{
@@ -23,7 +22,6 @@
 
 /* Toolbar */
 #toolbar{ border-bottom:1px solid var(--mb-line); box-shadow:var(--mb-sh-sm); gap:12px; }
-#toolbar .page-title{ color:var(--mb-ink); font-weight:800; }
 /* Toggles styled as switches, all on the checkbox so the markup is untouched. */
 #toolbar .tg{ color:#334155; font-weight:600; gap:9px; }
 #toolbar .tg input[type="checkbox"]{
@@ -61,7 +59,6 @@
   border-bottom:1px solid var(--mb-line); color:var(--mb-muted);
   font-weight:800; font-size:11px; text-transform:uppercase; letter-spacing:.05em;
 }
-#layout-panel .lp-toggle{ color:var(--mb-muted); }
 #layout-panel .ctl .val{ color:var(--mb-muted); }
 /* Slider fill and thumb in dark teal via accent-color. */
 #layout-panel input[type="range"]{ accent-color:var(--mb-teal); height:6px; }
@@ -71,8 +68,6 @@
 #info .title{ font-weight:800; }
 #info .muted{ color:var(--mb-muted-2); }
 #info dt{ color:var(--mb-muted); }
-#info .conn-h{ color:var(--mb-muted); text-transform:uppercase; letter-spacing:.03em; }
-#info .conn{ background:var(--mb-surf-2); border:1px solid var(--mb-line); border-radius:var(--mb-r-md); padding:8px 10px; }
 
 /* Isolated view bar (filters) */
 #iso-panel{ border-bottom:1px solid var(--mb-line); box-shadow:var(--mb-sh); color:var(--mb-ink); gap:8px; padding:10px 14px; }
@@ -169,7 +164,6 @@
   display:flex; align-items:center; justify-content:center;
   background:linear-gradient(135deg,var(--mb-purple),var(--mb-teal)); box-shadow:0 4px 12px rgba(106,48,108,.25); }
 #toolbar .tb-model-txt{ display:flex; flex-direction:column; align-items:flex-start; gap:4px; line-height:1.1; }
-#toolbar .tb-name{ font-weight:800; font-size:.92rem; color:var(--mb-ink); }
 /* Model select: a MINEBUGS pill like the filter dropdowns. It stays a native
    <select>; we style the visible trigger and draw the arrow as an SVG background. */
 #toolbar #model-select{
